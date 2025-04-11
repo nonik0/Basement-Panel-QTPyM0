@@ -13,12 +13,14 @@ private:
     const int CrashDelay = 30;
     const int ErrorDelay = 100;
     const int TunnelMinWidth = 3;
-    const int TunnelDifficultyCooldown = 200;
+    const int TunnelMaxWidthOffset = -2; // subtraces from dimension width
+    const int TunnelDifficultyCooldown = 100;
 
     // constant
     int _width;
     int _height;
     int _tunnelVisibleLength;
+    int _tunnelDimensionWidth;
     int _tunnelMaxWidth;
     Direction _tunnelDirection;
     bool _tunnelIsVertical;
@@ -73,7 +75,8 @@ TunnelRunner::TunnelRunner(
     _height = height;
     _tunnelDirection = tunnelDirection;
     _tunnelIsVertical = tunnelDirection.x == 0;
-    _tunnelMaxWidth = _tunnelIsVertical ? _width : _height;
+    _tunnelDimensionWidth = _tunnelIsVertical ? _width : _height;
+    _tunnelMaxWidth = _tunnelDimensionWidth + TunnelMaxWidthOffset;
     _tunnelVisibleLength = _tunnelIsVertical ? _height : _width;
     _pathColor = pathColor;
     _wallColor = wallColor;
@@ -90,6 +93,7 @@ TunnelRunner::TunnelRunner(
     Serial.println("height" + String(_height));
     // Serial.println("tunnelDirection:" + _tunnelDirection.x + "," + _tunnelDirection.y);
     Serial.println("tunnelIsVertical" + String(_tunnelIsVertical));
+    Serial.println("tunnelDimensionWidth" + String(_tunnelDimensionWidth));
     Serial.println("tunnelMaxWidth" + String(_tunnelMaxWidth));
     Serial.println("tunnelVisibleLength" + String(_tunnelVisibleLength));
 }
@@ -101,6 +105,7 @@ void TunnelRunner::init()
     _resetDelay = -1;
     _runnerCooldown = 0;
     _tunnelCooldown = 0;
+    _tunnelDifficultyCooldown = 0;
     _tunnelShrinking = true;
 
     // fill tunnel with walls (true)
@@ -112,7 +117,7 @@ void TunnelRunner::init()
         }
     }
 
-    _tunnelWidth = _tunnelMaxWidth - 2;
+    _tunnelWidth = _tunnelMaxWidth;
 
     if (_tunnelDirection == Left)
     {
@@ -246,7 +251,7 @@ bool TunnelRunner::advanceTunnel()
     // move all walls in direction of tunnel
     for (Location curLoc = startLoc; curLoc != endLoc; curLoc -= _tunnelDirection)
     {
-        for (int j = 0; j < _tunnelMaxWidth; j++)
+        for (int j = 0; j < _tunnelDimensionWidth; j++)
         {
             // copy wall from opposite direction of tunnel movement
             if (_tunnelIsVertical)
@@ -280,12 +285,26 @@ bool TunnelRunner::advanceTunnel()
             Serial.println("Tunnel now shrinking");
         }
 
-        // when tunnel shrinks decide which direction it shifts randomly
-        if (random() % 2 == 0)
+        // Randomly shift tunnel direction when shrinking
+        if (_tunnelShrinking)
         {
-            _tunnelLocation = _tunnelIsVertical
-                                  ? _tunnelLocation + Right
-                                  : _tunnelLocation + Down;
+            // shrinking width is implicit shift left or up
+            _tunnelLocation += _tunnelIsVertical ? (random() % 2) * Right : (random() % 2) * Down;
+        }
+        else
+        {
+            // expanding width is implicit shift right or down
+            _tunnelLocation += _tunnelIsVertical ? (random() % 2) * Left : (random() % 2) * Up;
+        }
+
+        // ensure tunnel doesn't shift OoB
+        if (_tunnelIsVertical)
+        {
+            _tunnelLocation.x = constrain(_tunnelLocation.x, 0, _width - _tunnelWidth);
+        }
+        else
+        {
+            _tunnelLocation.y = constrain(_tunnelLocation.y, 0, _height - _tunnelWidth);
         }
     }
     // randomly change tunnel location (shift center of tunnel)
@@ -322,7 +341,7 @@ bool TunnelRunner::advanceTunnel()
     }
 
     // now generate new walls for tunnel at far end
-    for (int i = 0; i < _tunnelMaxWidth; i++)
+    for (int i = 0; i < _tunnelDimensionWidth; i++)
     {
         if (_tunnelIsVertical)
         {
@@ -358,7 +377,7 @@ bool TunnelRunner::moveRunner()
     {
         Location lookAheadLoc = _runnerLocation - (i + 1) * _tunnelDirection;
 
-        for (int j = 0; j < _tunnelMaxWidth; j++)
+        for (int j = 0; j < _tunnelDimensionWidth; j++)
         {
             if (_tunnelIsVertical)
             {

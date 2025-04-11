@@ -1,5 +1,5 @@
 #include <Adafruit_NeoPixel.h>
-#include <Adafruit_TinyUSB.h> 
+#include <Adafruit_TinyUSB.h>
 #include <Arduino.h>
 
 #include "tunnel_runner.h"
@@ -8,7 +8,11 @@
 #define BUTTON_PIN A2
 #define LED_COUNT 1
 
+const uint32_t Amber = Adafruit_NeoPixel::Color(0xFF, 0x77, 0x00);
+
 void (*reset)(void) = 0;
+bool buttonState = true;
+bool rgbLedState = true;
 Adafruit_NeoPixel rgbLed(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 TunnelRunnerTaskHandler tunnelRunner;
 
@@ -20,7 +24,7 @@ void setup()
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   rgbLed.begin();
   rgbLed.setBrightness(5);
-  rgbLed.setPixelColor(0, rgbLed.Color(0xFF, 0x77, 0x00));
+  rgbLed.setPixelColor(0, Amber);
   rgbLed.show();
 
   while (!tunnelRunner.setup())
@@ -37,9 +41,15 @@ void loop()
 {
   tunnelRunner.tick();
 
-  bool buttonState = digitalRead(BUTTON_PIN);
-  if (buttonState == LOW)
+  if (digitalRead(BUTTON_PIN) != buttonState)
   {
-    reset();
+    buttonState = !buttonState;
+
+    if (!buttonState)
+    {
+      rgbLedState = !rgbLedState;
+      rgbLed.setPixelColor(0, rgbLedState ? Amber : 0);
+      rgbLed.show();
+    }
   }
 }
